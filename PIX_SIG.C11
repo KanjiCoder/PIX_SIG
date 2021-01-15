@@ -1,0 +1,247 @@
+    
+    #include <stdint.h>  
+    #include <string.h>  
+    #include <stdio.h> 
+    #include <assert.h>  
+
+
+//:PRINT_HEX_ARRAY:==========================================://
+#define I32  int32_t  /** GCC: <stdint.h> **/
+#define U32 uint32_t  /** GCC: <stdint.h> **/
+
+    void
+    PIX_SIG_PrintHexArray( U32* pix_arr , I32 m_i )
+    {
+        U32 u32_var;
+
+        for( int p_i = 0 ; p_i <= m_i ; p_i ++ ){
+
+            u32_var = pix_arr[ p_i ];
+            printf("0x");
+            printf("%08x" , u32_var);
+            printf("\n,");
+
+        };;
+    }
+
+#undef  U32
+#undef  I32
+//:==========================================:PRINT_HEX_ARRAY://
+//:TEXT_TO_PIXELS:===========================================://
+#define MAX_PIX ( 128 / 4  ) /** 32 pixels, 128 chars **/
+#define U32     uint32_t /** GCC: <stdint.h> **/
+#define I32      int32_t /** GCC: <stdint.h> **/
+#define U08      uint8_t /** GCC: <stdint.h> **/
+
+   /** pix_buf : Pixel Buffer **/
+    U32 PIX_SIG_pix_001[ MAX_PIX + 1 /**+1 for Null**/ ]={ 0 };
+    U32 PIX_SIG_pix_002[ MAX_PIX + 1 /**+1 for Null**/ ]={ 0 };
+
+    U32 PIX_SIG_GetByte( char* txt_str , int b_i , int m_i ){
+
+        U08 u08_var = 0x00;
+        if( b_i <= m_i ){ u08_var = txt_str[ b_i ]; };
+       
+        return( u08_var );
+    } 
+
+    U32
+    PIX_SIG_PackPixel_001( char* txt_str , int p_i, int mbi )
+    {
+        int com_dex = ( p_i * 4 ); /** index of red byte. **/
+        U32 u32_var = 0x00000000; //:Pixel Being Packed
+
+        #define TXT txt_str
+        #define DEX com_dex
+        u32_var=( 0x00 
+        |   ( PIX_SIG_GetByte( TXT,DEX+0,mbi ) << 24 )  //:RED  
+        |   ( PIX_SIG_GetByte( TXT,DEX+1,mbi ) << 16 )  //:GREEN
+        |   ( PIX_SIG_GetByte( TXT,DEX+2,mbi ) <<  8 )  //:BLUE
+        |   ( PIX_SIG_GetByte( TXT,DEX+3,mbi ) <<  0 )  //:ALPHA
+        );;
+        #undef  TXT
+        #undef  DEX
+
+        return( u32_var );
+    }
+
+    U32
+    PIX_SIG_PackPixel_002( char* txt_str , int p_i, int mbi )
+    {
+        /** packing for little endian systems like windows. **/
+
+        int com_dex = ( p_i * 4 ); /** index of red byte. **/
+        U32 u32_var = 0x00000000; //:Pixel Being Packed
+
+        #define TXT txt_str
+        #define DEX com_dex
+        u32_var=( 0x00 
+        |   ( PIX_SIG_GetByte( TXT,DEX+3,mbi ) << 24 )  //:RED  
+        |   ( PIX_SIG_GetByte( TXT,DEX+2,mbi ) << 16 )  //:GREEN
+        |   ( PIX_SIG_GetByte( TXT,DEX+1,mbi ) <<  8 )  //:BLUE
+        |   ( PIX_SIG_GetByte( TXT,DEX+0,mbi ) <<  0 )  //:ALPHA
+        );;
+        #undef  TXT
+        #undef  DEX
+
+        return( u32_var );
+    }
+
+    //: - - - - - - - - - - - - ---- - - - - - - - - - - - - ://
+
+    void
+    PIX_SIG_TextToPixels( char* txt_str )
+    {
+        //:declare_variables:--------------------------------://
+
+            U32 u32_var; //:pixel variable ( uint32 == RGBA )
+            I32     p_i; //:pixel index
+            I32     mpi; //:max pixel index
+            I32     mbi; //:max byte  index
+
+        //:--------------------------------:declare_variables://
+        //:era:erase_previous_buffer:------------------------://
+
+            for( int era = 0; era <( MAX_PIX ); era++ ){
+                PIX_SIG_pix_001[ era ]=( (U32)0x00000000 );
+                PIX_SIG_pix_002[ era ]=( (U32)0x00000000 );
+            };;
+
+        //:------------------------:era:erase_previous_buffer://
+        //:Figure_Out_Number_Of_Pixels:----------------------://
+
+            /** ******************************************** ***
+            Number of bytes is rounded DOWN to avoid          
+            segfaulting by accessing bytes that don't exist.  
+            Only the number of bytes divisible by 4 will be   
+            included in the final output.      
+            *** ******************************************** **/
+
+            int str_len = strlen( txt_str );
+            int num_pix =( str_len / 4 );
+            if( num_pix * 4 < str_len ){
+                /** Number of pixels was rounded down.       **/
+                /** add 1 to round up. This is only workable **/
+                /** because PIX_SIG_GetByte will protect us  **/
+                /** from out of bounds access.               **/
+
+                num_pix++; 
+            };;
+
+            /** Truncate so we don't overflow our buffer. **/
+            if( num_pix > MAX_PIX ){ num_pix = MAX_PIX; };
+
+        //:----------------------:Figure_Out_Number_Of_Pixels://        
+        //:Figure_Out_Maximum_Byte_Index:--------------------://
+
+            mbi =( ( MAX_PIX * 4 ) - 1 );
+            if( mbi > ( str_len - 1 ) ){ 
+
+                mbi = ( str_len - 1 ); 
+
+            };;
+
+        //:--------------------:Figure_Out_Maximum_Byte_Index://
+        //:Pack_The_Pixels:----------------------------------://
+        #define PAK_001 PIX_SIG_PackPixel_001
+        #define PAK_002 PIX_SIG_PackPixel_002
+        #define PRINT_H PIX_SIG_PrintHexArray
+
+            mpi = ( num_pix - 1 );
+            for( p_i    = 0 ; p_i <= mpi ; p_i ++ ){
+
+                u32_var = PAK_001( txt_str,p_i,mbi );
+                PIX_SIG_pix_001[ p_i ] = u32_var ;
+
+                u32_var = PAK_002( txt_str,p_i,mbi );
+                PIX_SIG_pix_002[ p_i ] = u32_var ;
+            };;
+
+            printf("\n");
+
+            printf("[BIG_ENDIAN]:\n");
+            PRINT_H( PIX_SIG_pix_001 , ( p_i - 1 ) );
+            printf("0x00000000");
+            printf("\n");
+            printf("\n");
+
+            printf("[LIT_ENDIAN]:\n");
+            PRINT_H( PIX_SIG_pix_002 , ( p_i - 1 ) );
+            printf("0x00000000");
+            printf("\n");
+            printf("\n");
+
+            for( p_i = p_i ; p_i < MAX_PIX ; p_i ++ ){
+                PIX_SIG_pix_001[ p_i ] = 0x00;
+                PIX_SIG_pix_002[ p_i ] = 0x00;
+            };;
+            PIX_SIG_pix_001[ MAX_PIX + 1 ] = 0x00;
+            PIX_SIG_pix_002[ MAX_PIX + 1 ] = 0x00;
+
+        #undef  PAK_001  
+        #undef  PAK_002  
+        #undef  PRINT_H
+        //:----------------------------------:Pack_The_Pixels://
+
+        printf( "[txt_str]:%s\n" , txt_str );
+    }
+
+#undef  MAX_PIX
+#undef      U32
+#undef      I32
+#undef      U08
+//:===========================================:TEXT_TO_PIXELS://
+
+    int main( int arg_num , char** arg_arr  ){
+
+        /** ***************************** **/
+        /** 2 arguments is exactly 1 user **/
+        /** supplied argument because 1st **/
+        /** argument is special.          **/
+        /** ***************************** **/
+
+        if( 2 == arg_num   ){
+            PIX_SIG_TextToPixels( arg_arr[ 1 ] );
+        }else{
+            printf("[User_Must_Supply]\n");
+            printf("[Exactly_1_Arg...]\n");
+        };;
+
+        printf("\n\n");
+        int big_endian[ 11 ]={ 
+             0x68747470
+            ,0x733a2f2f
+            ,0x67697468
+            ,0x75622e63
+            ,0x6f6d2f4b
+            ,0x616e6a69
+            ,0x436f6465
+            ,0x722f4141
+            ,0x43323032
+            ,0x30000000
+            ,0x00000000
+        };
+        int lit_endian[ 11 ]={ 
+             0x70747468
+            ,0x2f2f3a73
+            ,0x68746967
+            ,0x632e6275
+            ,0x4b2f6d6f
+            ,0x696a6e61
+            ,0x65646f43
+            ,0x41412f72
+            ,0x32303243
+            ,0x00000030
+            ,0x00000000
+        };
+
+        printf( (void*)&(big_endian[0]) );
+        printf("\n\n");
+        printf( (void*)&(lit_endian[0]) );
+        printf("\n\n");
+        
+        printf("[exiting_function]");
+    } 
+
+
+
